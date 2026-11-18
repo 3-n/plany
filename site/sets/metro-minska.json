@@ -1,0 +1,290 @@
+{
+ "version": 1,
+ "slug": "metro-minska",
+ "title": "Metro M3 – stacja Mińska (E02)",
+ "description": "Plan zagospodarowania terenu, zamierzenie budowlane nr 3 (11.04.2025), 1:500",
+ "og": "og.jpg",
+ "layers": [
+  {
+   "id": "pmwm4wlotzto5",
+   "name": "E02 Mińska – arkusz 1/5",
+   "width": 8192,
+   "height": 4282,
+   "points": [
+    {
+     "img": [
+      1965.7568516986023,
+      1644.7303730399096
+     ],
+     "world": [
+      21.061847135424618,
+      52.25705791654382
+     ]
+    },
+    {
+     "img": [
+      2426,
+      1491
+     ],
+     "world": [
+      21.062555909156803,
+      52.2571847479963
+     ]
+    },
+    {
+     "img": [
+      1342.0706787449285,
+      3234.087613065786
+     ],
+     "world": [
+      21.0609170794487,
+      52.255654537202425
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 1,
+   "display": "multiply",
+   "visible": true,
+   "rev": "d4def24a",
+   "images": {
+    "web": "pmwm4wlotzto5.web.webp",
+    "mobile": "pmwm4wlotzto5.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-metro-minska/pmwm4wlotzto5-page1.png",
+    "name": "page1.png",
+    "size": 14249390
+   }
+  },
+  {
+   "id": "pmwm4wmgepsua",
+   "name": "E02 Mińska – arkusz 2/5",
+   "width": 8192,
+   "height": 4282,
+   "points": [
+    {
+     "img": [
+      3381,
+      3397
+     ],
+     "world": [
+      21.07386619291492,
+      52.256094278442966
+     ]
+    },
+    {
+     "img": [
+      3367.1594707796867,
+      4173.579133007999
+     ],
+     "world": [
+      21.073843315243725,
+      52.255409485129874
+     ]
+    },
+    {
+     "img": [
+      2298.73735330026,
+      3411.2406093853056
+     ],
+     "world": [
+      21.07231177389622,
+      52.256085119557966
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 1,
+   "display": "multiply",
+   "visible": true,
+   "rev": "244d3c8a",
+   "images": {
+    "web": "pmwm4wmgepsua.web.webp",
+    "mobile": "pmwm4wmgepsua.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-metro-minska/pmwm4wmgepsua-page2.png",
+    "name": "page2.png",
+    "size": 15996955
+   }
+  },
+  {
+   "id": "pmwm4wn4tgxo2",
+   "name": "E02 Mińska – arkusz 3/5",
+   "width": 8192,
+   "height": 4093,
+   "points": [
+    {
+     "img": [
+      5317.79654791343,
+      299.8132752230961
+     ],
+     "world": [
+      21.07604138553143,
+      52.25266907860876
+     ]
+    },
+    {
+     "img": [
+      920.5,
+      1705
+     ],
+     "world": [
+      21.07428789138794,
+      52.25548172842768
+     ]
+    },
+    {
+     "img": [
+      5048.388864281355,
+      2563.615635191828
+     ],
+     "world": [
+      21.07362186536193,
+      52.25276277490143
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 1,
+   "display": "multiply",
+   "visible": true,
+   "rev": "c37ec553",
+   "images": {
+    "web": "pmwm4wn4tgxo2.web.webp",
+    "mobile": "pmwm4wn4tgxo2.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-metro-minska/pmwm4wn4tgxo2-page3.png",
+    "name": "page3.png",
+    "size": 13663638
+   }
+  },
+  {
+   "id": "pmwm4wnko6wpk",
+   "name": "E02 Mińska – arkusz 4/5",
+   "width": 8192,
+   "height": 3478,
+   "points": [
+    {
+     "img": [
+      1057.5024270161698,
+      2108.7615166785754
+     ],
+     "world": [
+      21.073754969984297,
+      52.25227099543904
+     ]
+    },
+    {
+     "img": [
+      3437.997769472867,
+      2784.5284597788714
+     ],
+     "world": [
+      21.073075307302638,
+      52.25041325523041
+     ]
+    },
+    {
+     "img": [
+      639.793427871464,
+      254.49032261058233
+     ],
+     "world": [
+      21.076042726635936,
+      52.25267010485617
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 1,
+   "display": "multiply",
+   "visible": true,
+   "rev": "a17c911f",
+   "images": {
+    "web": "pmwm4wnko6wpk.web.webp",
+    "mobile": "pmwm4wnko6wpk.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-metro-minska/pmwm4wnko6wpk-page4.png",
+    "name": "page4.png",
+    "size": 13483407
+   }
+  },
+  {
+   "id": "pmwm4wnzk1wxk",
+   "name": "E02 Mińska – arkusz 5/5",
+   "width": 8192,
+   "height": 3478,
+   "points": [
+    {
+     "img": [
+      3037.829575274451,
+      2631.1207419435204
+     ],
+     "world": [
+      21.06931976974011,
+      52.25211900656829
+     ]
+    },
+    {
+     "img": [
+      5328.8370823271935,
+      2053.7606876096993
+     ],
+     "world": [
+      21.070203557610515,
+      52.250384798235686
+     ]
+    },
+    {
+     "img": [
+      5540.75,
+      634.1018449562876
+     ],
+     "world": [
+      21.071989908814434,
+      52.250286273298414
+     ]
+    },
+    {
+     "img": [
+      1176.125836737691,
+      514.6293790174276
+     ],
+     "world": [
+      21.0718349040391,
+      52.253635389567975
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 1,
+   "display": "multiply",
+   "visible": true,
+   "rev": "3c5e820d",
+   "images": {
+    "web": "pmwm4wnzk1wxk.web.webp",
+    "mobile": "pmwm4wnzk1wxk.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-metro-minska/pmwm4wnzk1wxk-page5.png",
+    "name": "page5.png",
+    "size": 9528210
+   }
+  }
+ ],
+ "updated": "2026-11-18"
+}
