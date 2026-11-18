@@ -1,0 +1,64 @@
+{
+ "version": 1,
+ "slug": "zz-test",
+ "title": "Pipeline test (temporary)",
+ "description": "",
+ "og": "og.jpg",
+ "layers": [
+  {
+   "id": "pmwm581eugosg",
+   "name": "pipeline-test",
+   "width": 8192,
+   "height": 4096,
+   "points": [
+    {
+     "img": [
+      0,
+      0
+     ],
+     "world": [
+      21.065,
+      52.2525
+     ]
+    },
+    {
+     "img": [
+      2000,
+      1000
+     ],
+     "world": [
+      21.075,
+      52.2495
+     ]
+    },
+    {
+     "img": [
+      2000,
+      0
+     ],
+     "world": [
+      21.075,
+      52.2525
+     ]
+    }
+   ],
+   "method": "auto",
+   "mask": null,
+   "crop": null,
+   "opacity": 0.7,
+   "display": "multiply",
+   "visible": true,
+   "rev": "1c207356",
+   "images": {
+    "web": "pmwm581eugosg.web.webp",
+    "mobile": "pmwm581eugosg.mobile.webp"
+   },
+   "download": {
+    "url": "https://github.com/3-n/plany/releases/download/set-zz-test/pmwm581eugosg-pipeline-test.png",
+    "name": "pipeline-test.png",
+    "size": 9651
+   }
+  }
+ ],
+ "updated": "2026-11-18"
+}
