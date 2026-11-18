@@ -433,14 +433,14 @@ function renderList() {
       onclick: (e) => e.stopPropagation(),
       onchange: (e) => { layer.visible = e.target.checked; syncOverlay(layer); layerChanged(); renderQuick(); },
     });
-    const opacity = el('input', {
-      type: 'range', min: 0, max: 1, step: 0.05, value: layer.opacity ?? 0.7, title: 'Opacity',
+    const opacity = el('label', { class: 'field' }, 'Plan opacity', el('input', {
+      type: 'range', min: 0, max: 1, step: 0.05, value: layer.opacity ?? 0.7,
       oninput: (e) => { layer.opacity = +e.target.value; r.overlay?.setOpacity(layer.opacity); layerChanged(); renderQuick(); },
-    });
-    const display = el('select', {
+    }));
+    const display = el('label', { class: 'field' }, 'Blending', el('select', {
       title: 'How the plan is drawn over the photo',
-      onchange: (e) => { layer.display = e.target.value; syncOverlay(layer); layerChanged(); },
-    }, ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v, selected: (layer.display || 'multiply') === v }, d.label)));
+      onchange: (e) => { layer.display = e.target.value; syncOverlay(layer); layerChanged(); renderQuick(); },
+    }, ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v, selected: (layer.display || 'multiply') === v }, d.label))));
     const actions = el('div', { class: 'layer-actions' },
       el('button', { type: 'button', disabled: !r.fit, onclick: () => { const b = planBounds(layer); if (b) map.fitBounds(b); } }, 'Zoom to'),
       state.editable ? el('button', { type: 'button', onclick: () => openEditor(layer) }, 'Georeference') : null,
@@ -480,13 +480,21 @@ function downloadLink(layer) {
   return el('a', { class: 'download', href: d.url, download: d.name || '', title: d.name || '' }, `Original (${ext}${size}) ↓`);
 }
 
-// One slider for every visible plan: the quickest "before / after" on a phone.
+// One slider and one blending picker for every visible plan: the quickest "before / after" on a phone.
 function renderQuick() {
   const shown = state.layers.filter((l) => l.visible !== false && rt(l.id).fit);
   $('#quick').hidden = !state.layers.some((l) => rt(l.id).fit);
   const slider = $('#quick-opacity');
   slider.disabled = !shown.length;
   slider.value = shown.length ? Math.max(...shown.map((l) => l.opacity ?? 0.7)) : 0;
+  const modes = new Set(shown.map((l) => l.display || 'multiply'));
+  const select = $('#quick-display');
+  select.disabled = !shown.length;
+  select.replaceChildren(
+    modes.size > 1 ? el('option', { value: '', disabled: true }, 'Mixed') : null,
+    ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v }, d.label)),
+  );
+  select.value = modes.size === 1 ? [...modes][0] : '';
 }
 
 $('#quick-opacity').addEventListener('input', (e) => {
@@ -498,6 +506,15 @@ $('#quick-opacity').addEventListener('input', (e) => {
   layerChanged();
 });
 $('#quick-opacity').addEventListener('change', () => renderList());
+$('#quick-display').addEventListener('change', (e) => {
+  for (const l of state.layers) {
+    if (l.visible === false) continue;
+    l.display = e.target.value;
+    syncOverlay(l);
+  }
+  layerChanged();
+  renderList();
+});
 
 function moveLayer(layer, dir) {
   const i = state.layers.indexOf(layer), j = i + dir;
