@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Plan Overlay</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%230a66d8%22/%3E%3Cpath d=%22M6 22 16 6l10 16z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="app/style.css">
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/proj4/proj4.js"></script>
+  <script type="module" src="app/main.js"></script>
+</head>
+<body>
+  <div id="app">
+    <section id="imgpane" aria-label="Plan image">
+      <div id="imgmap"></div>
+      <div class="pane-tag">Plan</div>
+    </section>
+    <section id="mappane" aria-label="Map">
+      <div id="map"></div>
+      <div class="pane-tag map-tag">Map</div>
+    </section>
+
+    <aside id="panel">
+      <header class="panel-head">
+        <h1>Plan Overlay</h1>
+        <span id="status" class="status"></span>
+      </header>
+
+      <!-- Plan list -->
+      <div id="list-view" class="view">
+        <div class="toolbar">
+          <button id="add-btn" class="primary edit-only" type="button">+ Add plan (PDF / image)</button>
+        </div>
+        <ul id="layer-list" class="layer-list"></ul>
+        <p id="empty-hint" class="hint" hidden></p>
+        <details class="help">
+          <summary>Keys &amp; tips</summary>
+          <ul>
+            <li><kbd>T</kbd> toggles the selected plan on/off, a fast way to compare with what's there now.</li>
+            <li><kbd>M</kbd> measures distances; double-click ends a line, <kbd>Esc</kbd> clears.</li>
+            <li><b>Multiply</b> blending makes white paper see-through. <b>White → transparent</b> also works on dark photos.</li>
+            <li>The basemap switcher (top-left) has the Warsaw 2021 5&nbsp;cm photomap and cadastral parcels, which help to check alignment.</li>
+          </ul>
+        </details>
+      </div>
+
+      <!-- Georeferencing editor -->
+      <div id="editor-view" class="view" hidden>
+        <div class="toolbar">
+          <button id="ed-done" type="button">← Done</button>
+          <button id="ed-zoom" type="button">Zoom to plan</button>
+        </div>
+        <label class="field">Name <input id="ed-name" type="text" autocomplete="off"></label>
+
+        <div class="segmented" role="radiogroup" aria-label="Click mode">
+          <label><input type="radio" name="ed-mode" value="points" checked> Points</label>
+          <label><input type="radio" name="ed-mode" value="mask"> Crop mask</label>
+          <label><input type="radio" name="ed-mode" value="pan"> Pan only</label>
+        </div>
+
+        <p id="ed-hint" class="hint step"></p>
+
+        <div id="ed-points-block">
+          <div class="row">
+            <label class="field inline">Transform
+              <select id="ed-method">
+                <option value="auto">Auto</option>
+                <option value="similarity">Similarity (shift, rotate, scale)</option>
+                <option value="affine">Affine (+ stretch/skew, ≥3 pts)</option>
+                <option value="projective">Projective (photo of a plan, ≥4 pts)</option>
+              </select>
+            </label>
+          </div>
+          <p id="ed-fit" class="fit-info"></p>
+          <table class="points">
+            <thead><tr><th>#</th><th>Use</th><th title="Distance between where you put the point and where the fitted transform puts it">Error</th><th>Status</th><th></th></tr></thead>
+            <tbody id="ed-points"></tbody>
+          </table>
+
+          <form id="ed-coords" class="coords" hidden>
+            <div class="coords-title">Point <b id="ed-coords-id"></b>: type coordinates from the plan's grid</div>
+            <div class="row">
+              <label class="field inline">X (northing) <input id="ed-x" inputmode="decimal" placeholder="5789123.45" autocomplete="off"></label>
+              <label class="field inline">Y (easting) <input id="ed-y" inputmode="decimal" placeholder="7504321.00" autocomplete="off"></label>
+            </div>
+            <div class="row"><span id="ed-crs" class="muted"></span><button type="submit">Set</button></div>
+          </form>
+        </div>
+
+        <div id="ed-mask-block" hidden>
+          <p class="hint">Click around the part of the drawing to keep. Click the first vertex or press <kbd>Enter</kbd> to close, <kbd>Esc</kbd> cancels.</p>
+          <div class="toolbar">
+            <button id="ed-mask-finish" type="button">Finish mask</button>
+            <button id="ed-mask-clear" type="button">Remove mask</button>
+          </div>
+        </div>
+
+        <label class="field">Overlay opacity <input id="ed-opacity" type="range" min="0" max="1" step="0.05"></label>
+      </div>
+    </aside>
+  </div>
+
+  <dialog id="add-dialog">
+    <form method="dialog" id="add-form">
+      <h2>Add a plan</h2>
+      <label class="field">File <input id="add-file" type="file" accept=".pdf,application/pdf,image/*,.tif,.tiff" required></label>
+      <div id="add-pdf-opts" hidden>
+        <div class="row">
+          <label class="field inline">Page <select id="add-page"></select></label>
+          <label class="field inline">Resolution
+            <select id="add-dpi">
+              <option value="100">100 dpi</option>
+              <option value="150">150 dpi</option>
+              <option value="200" selected>200 dpi</option>
+              <option value="300">300 dpi</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field inline">Max size
+          <select id="add-max">
+            <option value="4096">4096 px</option>
+            <option value="8192" selected>8192 px</option>
+            <option value="12000">12000 px</option>
+          </select>
+        </label>
+        <label class="field inline">Store as
+          <select id="add-format">
+            <option value="image/jpeg">JPEG (scans)</option>
+            <option value="image/png">PNG (crisp lines)</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">Name <input id="add-name" type="text" autocomplete="off"></label>
+      <div class="add-preview"><canvas id="add-thumb" width="0" height="0"></canvas><p id="add-info" class="muted"></p></div>
+      <p id="add-progress" class="hint"></p>
+      <div class="toolbar end">
+        <button value="cancel" formnovalidate type="submit">Cancel</button>
+        <button id="add-go" class="primary" value="ok" type="submit">Add &amp; georeference</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
