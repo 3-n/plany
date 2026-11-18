@@ -1,9 +1,13 @@
 import { fitTransform, polishToLngLat, lngLatToPolish, distanceMeters } from './geo.js';
 import { WarpedImage } from './overlay.js';
+import { t, applyStatic, switchLang } from './i18n.js';
 
 const L = window.L;
 const proj4 = window.proj4;
 const $ = (sel) => document.querySelector(sel);
+
+applyStatic();
+$('#lang-btn').addEventListener('click', async () => { await flushSave(); switchLang(); });
 
 // Published set pages define window.PLANY = { set, base } before loading the app.
 const PUB = window.PLANY || null;
@@ -23,10 +27,10 @@ const rt = (id) => runtime.get(id) || runtime.set(id, {}).get(id);
 const byId = (id) => state.layers.find((l) => l.id === id);
 
 const DISPLAY = {
-  multiply: { label: 'Multiply (white = see-through)', blend: 'multiply' },
-  normal: { label: 'Normal', blend: 'normal' },
-  knockout: { label: 'White → transparent', blend: 'normal', knockout: true },
-  'knockout-invert': { label: 'White → transparent, inverted', blend: 'normal', knockout: true, filter: 'invert(1) hue-rotate(180deg)' },
+  multiply: { label: t('modeMultiply'), blend: 'multiply' },
+  normal: { label: t('modeNormal'), blend: 'normal' },
+  knockout: { label: t('modeKnockout'), blend: 'normal', knockout: true },
+  'knockout-invert': { label: t('modeKnockoutInvert'), blend: 'normal', knockout: true, filter: 'invert(1) hue-rotate(180deg)' },
 };
 
 const store = {
@@ -59,7 +63,7 @@ function manifest() {
 function scheduleSave() {
   if (!state.editable) return;
   dirty = true;
-  setStatus('Saving…');
+  setStatus(t('saving'));
   clearTimeout(saveTimer);
   saveTimer = setTimeout(flushSave, 500);
 }
@@ -73,16 +77,16 @@ async function flushSave(keepalive = false) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manifest()), keepalive,
     });
     if (!r.ok) throw new Error((await r.json()).error || r.statusText);
-    setStatus('Saved');
+    setStatus(t('saved'));
   } catch (e) {
     dirty = true;
-    setStatus(`Not saved: ${e.message}`, true);
+    setStatus(t('notSaved', e.message), true);
   }
 }
 
 async function putFile(path, blob) {
   const r = await fetch(`api/file?set=${state.set}&path=${encodeURIComponent(path)}`, { method: 'PUT', body: blob });
-  if (!r.ok) throw new Error(`Upload failed: ${(await r.json()).error || r.statusText}`);
+  if (!r.ok) throw new Error(t('uploadFailed', (await r.json()).error || r.statusText));
 }
 
 async function deleteFile(path) {
@@ -106,7 +110,7 @@ async function loadState() {
   }
   document.body.classList.toggle('can-edit', state.editable);
   document.body.classList.toggle('published', !state.editable);
-  setStatus(state.editable ? 'Saved' : '');
+  setStatus(state.editable ? t('saved') : '');
   if (!state.set) return;
   const base = PUB?.base || `data/${state.set}/`;
   try {
@@ -139,20 +143,21 @@ const ProjectedWMS = L.TileLayer.WMS.extend({
   },
 });
 
+// Keyed by a stable id (remembered in the browser); labels are translated below.
 const basemaps = {
-  'Ortofotomapa – Geoportal (newest)': L.tileLayer.wms('https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution', {
+  orto: L.tileLayer.wms('https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/HighResolution', {
     layers: 'Raster', format: 'image/jpeg', version: '1.3.0', crs: L.CRS.EPSG4326, tileSize: 512, maxZoom: 23,
     attribution: 'Ortofotomapa © <a href="https://www.geoportal.gov.pl" target="_blank">GUGiK</a>',
   }),
-  'Warszawa – fotoplan 2021, 5 cm': new ProjectedWMS('https://wms.um.warszawa.pl/serwis', {
+  waw2021: new ProjectedWMS('https://wms.um.warszawa.pl/serwis', {
     layers: 'RASTER_FOTOPLAN_2021', format: 'image/jpeg', version: '1.1.1', crs: { code: 'EPSG:2178' }, tileSize: 512, maxZoom: 23,
     bounds: [[52.08, 20.82], [52.39, 21.30]],
     attribution: 'Fotoplan © <a href="https://mapa.um.warszawa.pl" target="_blank">m.st. Warszawa</a>',
   }),
-  'Esri World Imagery': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxNativeZoom: 19, maxZoom: 23, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics',
   }),
-  OpenStreetMap: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxNativeZoom: 19, maxZoom: 23, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
   }),
 };
@@ -165,22 +170,26 @@ map.createPane('cadastre').style.zIndex = 450;
 map.createPane('measure').style.zIndex = 650;
 const KIEG = 'https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow';
 const overlays = {
-  'Działki (cadastral parcels)': L.tileLayer.wms(KIEG, {
+  parcels: L.tileLayer.wms(KIEG, {
     layers: 'dzialki,numery_dzialek', format: 'image/png', transparent: true, version: '1.3.0', tileSize: 512,
     minZoom: 15, maxZoom: 23, pane: 'cadastre', attribution: 'KIEG © GUGiK',
   }),
-  'Budynki (cadastral buildings)': L.tileLayer.wms(KIEG, {
+  buildings: L.tileLayer.wms(KIEG, {
     layers: 'budynki', format: 'image/png', transparent: true, version: '1.3.0', tileSize: 512,
     minZoom: 15, maxZoom: 23, pane: 'cadastre', attribution: 'KIEG © GUGiK',
   }),
 };
 
-const baseName = store.get('basemap', 'Ortofotomapa – Geoportal (newest)');
-(basemaps[baseName] || Object.values(basemaps)[0]).addTo(map);
-for (const name of store.get('overlays', [])) overlays[name]?.addTo(map);
-L.control.layers(basemaps, overlays, { position: 'topleft' }).addTo(map);
-map.on('baselayerchange', (e) => store.set('basemap', e.name));
-map.on('overlayadd overlayremove', () => store.set('overlays', Object.keys(overlays).filter((n) => map.hasLayer(overlays[n]))));
+const LAYER_LABELS = {
+  orto: t('basemapOrto'), waw2021: t('basemapWaw'), esri: 'Esri World Imagery', osm: 'OpenStreetMap',
+  parcels: t('overlayParcels'), buildings: t('overlayBuildings'),
+};
+const labelled = (layers) => Object.fromEntries(Object.entries(layers).map(([id, l]) => [LAYER_LABELS[id], l]));
+(basemaps[store.get('basemap', 'orto')] || basemaps.orto).addTo(map);
+for (const id of store.get('overlays', [])) overlays[id]?.addTo(map);
+L.control.layers(labelled(basemaps), labelled(overlays), { position: 'topleft' }).addTo(map);
+map.on('baselayerchange', (e) => store.set('basemap', Object.keys(basemaps).find((id) => basemaps[id] === e.layer)));
+map.on('overlayadd overlayremove', () => store.set('overlays', Object.keys(overlays).filter((id) => map.hasLayer(overlays[id]))));
 
 // The URL hash holds the view and, on published pages, any plan settings that differ
 // from the set's defaults, so the address bar is always a shareable link:
@@ -245,7 +254,7 @@ const Measure = L.Control.extend({
     const el = L.DomUtil.create('div', 'leaflet-bar measure-ctl');
     const a = (this._btn = L.DomUtil.create('a', '', el));
     a.href = '#';
-    a.title = 'Measure distance (M)';
+    a.title = t('measure');
     a.setAttribute('role', 'button');
     a.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>';
     L.DomEvent.disableClickPropagation(el);
@@ -373,7 +382,7 @@ async function syncOverlay(layer) {
     source = await overlaySource(layer);
   } catch (e) {
     console.error(e);
-    setStatus(`Could not load ${layer.image}`, true);
+    setStatus(t('couldNotLoad', layer.image), true);
     return;
   }
   if (token !== r.token || !byId(layer.id)) return; // superseded by a newer call, or deleted
@@ -404,9 +413,9 @@ function planBounds(layer) {
 function fitSummary(layer) {
   const fit = rt(layer.id).fit;
   const n = (layer.points || []).filter((p) => p.img && p.world).length;
-  if (!fit) return n ? `${n} point${n > 1 ? 's' : ''}, needs at least 2` : 'Not georeferenced yet';
+  if (!fit) return n ? t('needsTwo', n) : t('notGeoreferenced');
   const scale = layer.dpi ? ` · ≈ 1:${Math.round(fit.mPerPx / (0.0254 / layer.dpi))}` : '';
-  return `${fit.n} points · ${fit.exact ? 'exact fit' : `RMS ${fmtM(fit.rms)}`}${scale}`;
+  return `${t('points', fit.n)} · ${fit.exact ? t('exactFit') : `RMS ${fmtM(fit.rms)}`}${scale}`;
 }
 
 const fmtM = (m) => (m < 1 ? `${Math.round(m * 100)} cm` : `${m.toFixed(2)} m`);
@@ -429,24 +438,24 @@ function renderList() {
   for (const layer of state.layers) {
     const r = rt(layer.id);
     const vis = el('input', {
-      type: 'checkbox', checked: layer.visible !== false, title: 'Show/hide (T)',
+      type: 'checkbox', checked: layer.visible !== false, title: t('showHide'),
       onclick: (e) => e.stopPropagation(),
       onchange: (e) => { layer.visible = e.target.checked; syncOverlay(layer); layerChanged(); renderQuick(); },
     });
-    const opacity = el('label', { class: 'field' }, 'Plan opacity', el('input', {
+    const opacity = el('label', { class: 'field' }, t('layerOpacity'), el('input', {
       type: 'range', min: 0, max: 1, step: 0.05, value: layer.opacity ?? 0.7,
       oninput: (e) => { layer.opacity = +e.target.value; r.overlay?.setOpacity(layer.opacity); layerChanged(); renderQuick(); },
     }));
-    const display = el('label', { class: 'field' }, 'Blending', el('select', {
-      title: 'How the plan is drawn over the photo',
+    const display = el('label', { class: 'field' }, t('blending'), el('select', {
+      title: t('blendingTitle'),
       onchange: (e) => { layer.display = e.target.value; syncOverlay(layer); layerChanged(); renderQuick(); },
     }, ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v, selected: (layer.display || 'multiply') === v }, d.label))));
     const actions = el('div', { class: 'layer-actions' },
-      el('button', { type: 'button', disabled: !r.fit, onclick: () => { const b = planBounds(layer); if (b) map.fitBounds(b); } }, 'Zoom to'),
-      state.editable ? el('button', { type: 'button', onclick: () => openEditor(layer) }, 'Georeference') : null,
-      state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, -1), title: 'Draw above the plan before it' }, '↑') : null,
-      state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, 1), title: 'Draw below the plan after it' }, '↓') : null,
-      state.editable ? el('button', { type: 'button', class: 'danger', onclick: () => removeLayer(layer) }, 'Delete') : null,
+      el('button', { type: 'button', disabled: !r.fit, onclick: () => { const b = planBounds(layer); if (b) map.fitBounds(b); } }, t('zoomTo')),
+      state.editable ? el('button', { type: 'button', onclick: () => openEditor(layer) }, t('georeference')) : null,
+      state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, -1), title: t('moveUp') }, '↑') : null,
+      state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, 1), title: t('moveDown') }, '↓') : null,
+      state.editable ? el('button', { type: 'button', class: 'danger', onclick: () => removeLayer(layer) }, t('delete')) : null,
       downloadLink(layer),
     );
     const li = el('li', {
@@ -462,8 +471,8 @@ function renderList() {
   const hint = $('#empty-hint');
   hint.hidden = state.layers.length > 0;
   hint.textContent = state.editable
-    ? 'No plans yet. Add a PDF or a scan, then match a few points between the plan and the aerial photo.'
-    : 'No plans published here yet.';
+    ? t('emptyEdit')
+    : t('emptyView');
   renderQuick();
 }
 
@@ -477,7 +486,7 @@ function downloadLink(layer) {
   if (!d) return null;
   const ext = (d.name || d.url).split('.').pop().toUpperCase().slice(0, 4);
   const size = d.size ? `, ${(d.size / 1e6).toFixed(d.size < 1e7 ? 1 : 0)} MB` : '';
-  return el('a', { class: 'download', href: d.url, download: d.name || '', title: d.name || '' }, `Original (${ext}${size}) ↓`);
+  return el('a', { class: 'download', href: d.url, download: d.name || '', title: d.name || '' }, t('original', ext, size));
 }
 
 // One slider and one blending picker for every visible plan: the quickest "before / after" on a phone.
@@ -491,7 +500,7 @@ function renderQuick() {
   const select = $('#quick-display');
   select.disabled = !shown.length;
   select.replaceChildren(
-    modes.size > 1 ? el('option', { value: '', disabled: true }, 'Mixed') : null,
+    modes.size > 1 ? el('option', { value: '', disabled: true }, t('mixed')) : null,
     ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v }, d.label)),
   );
   select.value = modes.size === 1 ? [...modes][0] : '';
@@ -526,7 +535,7 @@ function moveLayer(layer, dir) {
 }
 
 async function removeLayer(layer) {
-  if (!confirm(`Delete "${layer.name}" and its files?`)) return;
+  if (!confirm(t('confirmDelete', layer.name))) return;
   const r = rt(layer.id);
   if (r.overlay) map.removeLayer(r.overlay);
   runtime.delete(layer.id);
@@ -541,9 +550,9 @@ async function removeLayer(layer) {
 // ---------------------------------------------------------------- set header, sharing, set picker
 
 function renderSetInfo() {
-  const title = state.meta.title || (state.editable ? state.set : '') || 'Plan Overlay';
+  const title = state.meta.title || (state.editable ? state.set : '') || t('appName');
   $('#set-title-view').textContent = title;
-  document.title = state.editable ? `${title} · Plan Overlay` : title;
+  document.title = state.editable ? `${title} · ${t('appName')}` : title;
   const desc = $('#set-desc-view');
   desc.textContent = state.meta.description;
   desc.hidden = state.editable || !state.meta.description;
@@ -559,7 +568,7 @@ $('#set-select').addEventListener('change', async (e) => {
   location.href = `?set=${e.target.value}`;
 });
 $('#set-new').addEventListener('click', async () => {
-  const slug = prompt('Short name for the new set, used in its link (lowercase, digits, dashes):', '');
+  const slug = prompt(t('newSetPrompt'), '');
   if (!slug) return;
   const r = await fetch('api/sets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug.trim(), title: slug.trim() }) });
   const res = await r.json();
@@ -574,7 +583,7 @@ for (const [id, key] of [['#set-title', 'title'], ['#set-desc', 'description']])
 function setPanelOpen(open) {
   document.body.classList.toggle('panel-collapsed', !open);
   $('#panel-toggle').setAttribute('aria-expanded', String(open));
-  $('#panel-toggle').textContent = open ? 'Hide plans ▾' : `Plans (${state.layers.length}) ▴`;
+  $('#panel-toggle').textContent = open ? t('hidePlans') : t('showPlans', state.layers.length);
   setTimeout(() => map.invalidateSize(), 0);
 }
 $('#panel-toggle').addEventListener('click', () => setPanelOpen(document.body.classList.contains('panel-collapsed')));
@@ -589,11 +598,11 @@ $('#share-btn').addEventListener('click', async () => {
       return;
     }
     await navigator.clipboard.writeText(url);
-    setStatus('Link copied');
+    setStatus(t('linkCopied'));
   } catch (e) {
-    if (e.name !== 'AbortError') prompt('Copy this link:', url);
+    if (e.name !== 'AbortError') prompt(t('copyThisLink'), url);
   }
-  setTimeout(() => setStatus(state.editable ? 'Saved' : ''), 2000);
+  setTimeout(() => setStatus(state.editable ? t('saved') : ''), 2000);
 });
 
 // ---------------------------------------------------------------- adding plans
@@ -641,12 +650,12 @@ $('#add-file').addEventListener('change', async (e) => {
   $('#add-format').value = isPdf ? 'image/jpeg' : (file.type === 'image/png' ? 'image/png' : 'image/jpeg');
   try {
     if (isPdf) {
-      $('#add-info').textContent = 'Reading PDF…';
+      $('#add-info').textContent = t('readingPdf');
       const lib = await loadPdfjs();
       add.pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
       const sel = $('#add-page');
-      sel.replaceChildren(...Array.from({ length: add.pdf.numPages }, (_, i) => el('option', { value: i + 1 }, `${i + 1} of ${add.pdf.numPages}`)));
-      if (add.pdf.numPages > 1) sel.append(el('option', { value: 'all' }, 'All pages (one plan each)'));
+      sel.replaceChildren(...Array.from({ length: add.pdf.numPages }, (_, i) => el('option', { value: i + 1 }, t('pageOf', i + 1, add.pdf.numPages))));
+      if (add.pdf.numPages > 1) sel.append(el('option', { value: 'all' }, t('allPages')));
       await pdfPreview();
     } else {
       const img = new Image();
@@ -658,7 +667,7 @@ $('#add-file').addEventListener('change', async (e) => {
     }
   } catch (err) {
     console.error(err);
-    $('#add-info').textContent = `Can't open this file: ${err.message}`;
+    $('#add-info').textContent = t('cantOpen', err.message);
   }
 });
 
@@ -680,7 +689,7 @@ async function pdfPreview() {
   const vp1 = page.getViewport({ scale: 1 });
   const { width, height, dpi } = pdfRenderSize(vp1);
   const mm = (pt) => Math.round((pt / 72) * 25.4);
-  $('#add-info').textContent = `Page ${mm(vp1.width)} × ${mm(vp1.height)} mm → ${width} × ${height} px (${Math.round(dpi)} dpi)`;
+  $('#add-info').textContent = t('pageInfo', mm(vp1.width), mm(vp1.height), width, height, Math.round(dpi));
   const s = Math.min(200 / vp1.width, 200 / vp1.height);
   const vp = page.getViewport({ scale: s });
   const c = document.createElement('canvas');
@@ -733,7 +742,7 @@ async function rasterFromImage(file) {
   return { canvas: c, asIs };
 }
 
-const toBlob = (canvas, type) => new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Image too large for this browser; try a smaller max size'))), type, 0.9));
+const toBlob = (canvas, type) => new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error(t('tooLarge')))), type, 0.9));
 const newId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 $('#add-form').addEventListener('submit', async (e) => {
@@ -751,12 +760,12 @@ $('#add-form').addEventListener('submit', async (e) => {
     const pages = add.pdf ? ($('#add-page').value === 'all' ? Array.from({ length: add.pdf.numPages }, (_, i) => i + 1) : [+$('#add-page').value]) : [null];
     const sourceId = newId();
     const source = `sources/${sourceId}.${ext}`;
-    progress.textContent = 'Saving original file…';
+    progress.textContent = t('savingOriginal');
     await putFile(source, file);
     const created = [];
     for (const pageNo of pages) {
       const id = pages.length > 1 ? `${sourceId}_${pageNo}` : sourceId;
-      progress.textContent = pageNo ? `Rendering page ${pageNo}…` : 'Preparing image…';
+      progress.textContent = pageNo ? t('renderingPage', pageNo) : t('preparingImage');
       let canvas, dpi = null, blob, image;
       if (pageNo) {
         ({ canvas, dpi } = await renderPdfPage(pageNo));
@@ -768,10 +777,10 @@ $('#add-form').addEventListener('submit', async (e) => {
         blob = r.asIs || (await toBlob(canvas, format));
         image = `layers/${id}.${r.asIs ? ext.replace('jpeg', 'jpg') : imgExt}`;
       }
-      progress.textContent = `Saving ${(blob.size / 1e6).toFixed(1)} MB…`;
+      progress.textContent = t('savingMb', (blob.size / 1e6).toFixed(1));
       await putFile(image, blob);
       const layer = {
-        id, name: pages.length > 1 ? `${baseName} – p. ${pageNo}` : baseName,
+        id, name: pages.length > 1 ? `${baseName} – ${t('pageSuffix', pageNo)}` : baseName,
         image, source, sourceName: file.name, sourcePage: pageNo, dpi: dpi ? Math.round(dpi * 10) / 10 : null,
         width: canvas.width, height: canvas.height,
         points: [], method: 'auto', mask: null, opacity: 0.7, display: 'multiply', visible: true,
@@ -1045,30 +1054,30 @@ function refreshEditor() {
 
   const info = $('#ed-fit');
   if (fit) {
-    const scale = layer.dpi ? ` · plan scale ≈ <b>1:${Math.round(fit.mPerPx / (0.0254 / layer.dpi))}</b>` : '';
-    const acc = fit.exact ? 'exact fit, add a point to check the error' : `RMS error <b>${fmtM(fit.rms)}</b>`;
-    info.innerHTML = `Using <b>${fit.method}</b> with ${fit.n} points · ${acc} · 1 px = ${fmtM(fit.mPerPx)}${scale}`;
+    const scale = layer.dpi ? t('planScale', Math.round(fit.mPerPx / (0.0254 / layer.dpi))) : '';
+    const acc = fit.exact ? t('exactFitHint') : t('rmsError', fmtM(fit.rms));
+    info.innerHTML = t('fitInfo', t('methodName')[fit.method] || fit.method, fit.n, acc, fmtM(fit.mPerPx), scale);
   } else {
-    info.textContent = 'Place at least 2 point pairs to see the plan on the map.';
+    info.textContent = t('placeTwo');
   }
 
   const tbody = $('#ed-points');
   tbody.replaceChildren();
   for (const p of layer.points) {
     const res = fit?.residuals[p.id];
-    const status = p.img && p.world ? (p.typed ? 'typed coords' : 'placed') : p.img ? 'needs map point' : 'needs plan point';
+    const status = p.img && p.world ? (p.typed ? t('stTyped') : t('stPlaced')) : p.img ? t('stNeedsMap') : t('stNeedsPlan');
     const tr = el('tr', {
       class: [p.id === ed.selectedId ? 'selected' : '', p.enabled === false ? 'disabled' : ''].join(' '),
       onclick: (e) => { if (!e.target.closest('button, input')) selectPoint(p.id); },
     },
     el('td', { class: 'num' }, String(p.id)),
     el('td', {}, el('input', {
-      type: 'checkbox', checked: p.enabled !== false, title: 'Use this point in the fit',
+      type: 'checkbox', checked: p.enabled !== false, title: t('useInFit'),
       onchange: (e) => { p.enabled = e.target.checked; pointsChanged(); },
     })),
     el('td', { class: res != null && !fit.exact ? resClass(res) : '' }, res != null && !fit.exact ? fmtM(res) : '–'),
     el('td', { class: 'muted' }, status),
-    el('td', {}, el('button', { type: 'button', class: 'x', title: 'Delete point', onclick: () => deletePoint(p.id) }, '×')));
+    el('td', {}, el('button', { type: 'button', class: 'x', title: t('deletePoint'), onclick: () => deletePoint(p.id) }, '×')));
     tbody.append(tr);
   }
 
@@ -1086,7 +1095,7 @@ function refreshEditor() {
       } else {
         $('#ed-x').value = '';
         $('#ed-y').value = '';
-        $('#ed-crs').textContent = 'PL-2000 (zone from Y) or PUWG-1992';
+        $('#ed-crs').textContent = t('crsUnknown');
       }
     }
   }
@@ -1098,13 +1107,13 @@ function refreshHint() {
   const hint = $('#ed-hint');
   const complete = ed.layer.points.filter((p) => p.img && p.world).length;
   const p = ed.pendingId ? pointById(ed.pendingId) : null;
-  if (ed.mode === 'mask') hint.textContent = 'Crop mask: click on the plan (left) to outline the area to show. Title blocks and legends usually go.';
-  else if (ed.mode === 'pan') hint.textContent = 'Pan only: clicks do nothing, so you can look around.';
-  else if (p && p.img) hint.textContent = `Point ${p.id}: now click the same spot on the map (right), or type its coordinates below. Esc cancels.`;
-  else if (p && p.world) hint.textContent = `Point ${p.id}: now click the same spot on the plan (left). Esc cancels.`;
-  else if (complete < 2) hint.textContent = `Click a sharp spot on the plan (left), then the same spot on the map (right). Building corners, kerb corners, manholes or grid crosses work well. ${complete}/2 points so far.`;
-  else if (complete < 4) hint.textContent = 'The plan is on the map. Add 1–2 more points far apart, ideally near the sheet corners, to measure the error. Drag markers to refine them.';
-  else hint.textContent = 'Points with a red error are probably misplaced: drag them or untick them. Switch to Pan only to look around.';
+  if (ed.mode === 'mask') hint.textContent = t('hintMask');
+  else if (ed.mode === 'pan') hint.textContent = t('hintPan');
+  else if (p && p.img) hint.textContent = t('hintNeedMap', p.id);
+  else if (p && p.world) hint.textContent = t('hintNeedPlan', p.id);
+  else if (complete < 2) hint.textContent = t('hintStart', complete);
+  else if (complete < 4) hint.textContent = t('hintMore');
+  else hint.textContent = t('hintDone');
 }
 
 $('#ed-coords').addEventListener('submit', (e) => {
@@ -1116,7 +1125,7 @@ $('#ed-coords').addEventListener('submit', (e) => {
   if (!Number.isFinite(X) || !Number.isFinite(Y)) return;
   const { lngLat, code } = polishToLngLat(X, Y);
   if (!(lngLat[1] > 48 && lngLat[1] < 56 && lngLat[0] > 13 && lngLat[0] < 25)) {
-    alert(`These coordinates land outside Poland (${code}). In Polish notation X is the northing and Y the easting. Did you swap them?`);
+    alert(t('outsidePoland', code));
     return;
   }
   p.world = lngLat;

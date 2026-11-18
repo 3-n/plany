@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,51 +13,52 @@
 </head>
 <body>
   <div id="app">
-    <section id="imgpane" aria-label="Plan image">
+    <section id="imgpane" aria-label="Plan image" data-i18n-aria="paneImage">
       <div id="imgmap"></div>
-      <div class="pane-tag">Plan</div>
+      <div class="pane-tag" data-i18n="tagPlan">Plan</div>
     </section>
-    <section id="mappane" aria-label="Map">
+    <section id="mappane" aria-label="Map" data-i18n-aria="paneMap">
       <div id="map"></div>
-      <div class="pane-tag map-tag">Map</div>
+      <div class="pane-tag map-tag" data-i18n="tagMap">Map</div>
     </section>
 
     <aside id="panel">
       <header class="panel-head">
         <h1 id="set-title-view">Plan Overlay</h1>
         <span id="status" class="status" role="status"></span>
-        <button id="share-btn" type="button" title="Copy a link to exactly this view">Copy link</button>
+        <button id="share-btn" type="button" title="Copy a link to exactly this view" data-i18n="copyLink" data-i18n-title="copyLinkTitle">Copy link</button>
+        <button id="lang-btn" type="button" data-i18n="langSwitch" data-i18n-title="langSwitchTitle">PL</button>
         <button id="panel-toggle" type="button" aria-expanded="true">Hide plans ▾</button>
       </header>
       <p id="set-desc-view" class="set-desc" hidden></p>
 
       <div id="quick" class="quick" hidden>
-        <label class="field">Plan opacity <input id="quick-opacity" type="range" min="0" max="1" step="0.05"></label>
-        <label class="field">Blending <select id="quick-display"></select></label>
+        <label class="field" data-i18n="planOpacity">Plan opacity <input id="quick-opacity" type="range" min="0" max="1" step="0.05"></label>
+        <label class="field" data-i18n="blending">Blending <select id="quick-display"></select></label>
       </div>
 
       <!-- Plan list -->
       <div id="list-view" class="view">
         <div class="set-meta edit-only">
           <div class="row">
-            <label class="field inline">Plan set <select id="set-select"></select></label>
-            <button id="set-new" type="button">New set</button>
+            <label class="field inline" data-i18n="planSet">Plan set <select id="set-select"></select></label>
+            <button id="set-new" type="button" data-i18n="newSet">New set</button>
           </div>
-          <label class="field">Title (shown on the published page) <input id="set-title" type="text" autocomplete="off"></label>
-          <label class="field">Description (for link previews) <input id="set-desc" type="text" autocomplete="off"></label>
+          <label class="field" data-i18n="setTitle">Title (shown on the published page) <input id="set-title" type="text" autocomplete="off"></label>
+          <label class="field" data-i18n="setDesc">Description (for link previews) <input id="set-desc" type="text" autocomplete="off"></label>
         </div>
         <div class="toolbar">
-          <button id="add-btn" class="primary edit-only" type="button">+ Add plan (PDF / image)</button>
+          <button id="add-btn" class="primary edit-only" type="button" data-i18n="addPlan">+ Add plan (PDF / image)</button>
         </div>
         <ul id="layer-list" class="layer-list"></ul>
         <p id="empty-hint" class="hint" hidden></p>
         <details class="help">
-          <summary>Keys &amp; tips</summary>
+          <summary data-i18n="tips">Keys &amp; tips</summary>
           <ul>
-            <li><kbd>T</kbd> toggles the selected plan on/off, a fast way to compare with what's there now.</li>
-            <li><kbd>M</kbd> measures distances; double-click ends a line, <kbd>Esc</kbd> clears.</li>
-            <li><b>Multiply</b> blending makes white paper see-through. <b>White → transparent</b> also works on dark photos.</li>
-            <li>The basemap switcher (top-left) has the Warsaw 2021 5&nbsp;cm photomap and cadastral parcels, which help to check alignment.</li>
+            <li data-i18n-html="tipToggle"><kbd>T</kbd> toggles the selected plan on/off, a fast way to compare with what's there now.</li>
+            <li data-i18n-html="tipMeasure"><kbd>M</kbd> measures distances; double-click ends a line, <kbd>Esc</kbd> clears.</li>
+            <li data-i18n-html="tipBlend"><b>Multiply</b> blending makes white paper see-through. <b>White → transparent</b> also works on dark photos.</li>
+            <li data-i18n-html="tipBasemap">The basemap switcher (top-left) has the Warsaw 2021 5&nbsp;cm photomap and cadastral parcels, which help to check alignment.</li>
           </ul>
         </details>
       </div>
@@ -65,67 +66,67 @@
       <!-- Georeferencing editor -->
       <div id="editor-view" class="view" hidden>
         <div class="toolbar">
-          <button id="ed-done" type="button">← Done</button>
-          <button id="ed-zoom" type="button">Zoom to plan</button>
+          <button id="ed-done" type="button" data-i18n="edDone">← Done</button>
+          <button id="ed-zoom" type="button" data-i18n="edZoom">Zoom to plan</button>
         </div>
-        <label class="field">Name <input id="ed-name" type="text" autocomplete="off"></label>
+        <label class="field" data-i18n="name">Name <input id="ed-name" type="text" autocomplete="off"></label>
 
-        <div class="segmented" role="radiogroup" aria-label="Click mode">
-          <label><input type="radio" name="ed-mode" value="points" checked> Points</label>
-          <label><input type="radio" name="ed-mode" value="mask"> Crop mask</label>
-          <label><input type="radio" name="ed-mode" value="pan"> Pan only</label>
+        <div class="segmented" role="radiogroup" aria-label="Click mode" data-i18n-aria="clickMode">
+          <label data-i18n="modePoints"><input type="radio" name="ed-mode" value="points" checked> Points</label>
+          <label data-i18n="modeMask"><input type="radio" name="ed-mode" value="mask"> Crop mask</label>
+          <label data-i18n="modePan"><input type="radio" name="ed-mode" value="pan"> Pan only</label>
         </div>
 
         <p id="ed-hint" class="hint step"></p>
 
         <div id="ed-points-block">
           <div class="row">
-            <label class="field inline">Transform
+            <label class="field inline" data-i18n="transform">Transform
               <select id="ed-method">
-                <option value="auto">Auto</option>
-                <option value="similarity">Similarity (shift, rotate, scale)</option>
-                <option value="affine">Affine (+ stretch/skew, ≥3 pts)</option>
-                <option value="projective">Projective (photo of a plan, ≥4 pts)</option>
+                <option value="auto" data-i18n="methodAuto">Auto</option>
+                <option value="similarity" data-i18n="methodSimilarity">Similarity (shift, rotate, scale)</option>
+                <option value="affine" data-i18n="methodAffine">Affine (+ stretch/skew, ≥3 pts)</option>
+                <option value="projective" data-i18n="methodProjective">Projective (photo of a plan, ≥4 pts)</option>
               </select>
             </label>
           </div>
           <p id="ed-fit" class="fit-info"></p>
           <table class="points">
-            <thead><tr><th>#</th><th>Use</th><th title="Distance between where you put the point and where the fitted transform puts it">Error</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th data-i18n="colUse">Use</th><th title="Distance between where you put the point and where the fitted transform puts it" data-i18n="colError" data-i18n-title="colErrorTitle">Error</th><th data-i18n="colStatus">Status</th><th></th></tr></thead>
             <tbody id="ed-points"></tbody>
           </table>
 
           <form id="ed-coords" class="coords" hidden>
-            <div class="coords-title">Point <b id="ed-coords-id"></b>: type coordinates from the plan's grid</div>
+            <div class="coords-title" data-i18n-html="coordsTitle">Point <b id="ed-coords-id"></b>: type coordinates from the plan's grid</div>
             <div class="row">
-              <label class="field inline">X (northing) <input id="ed-x" inputmode="decimal" placeholder="5789123.45" autocomplete="off"></label>
-              <label class="field inline">Y (easting) <input id="ed-y" inputmode="decimal" placeholder="7504321.00" autocomplete="off"></label>
+              <label class="field inline" data-i18n="northing">X (northing) <input id="ed-x" inputmode="decimal" placeholder="5789123.45" autocomplete="off"></label>
+              <label class="field inline" data-i18n="easting">Y (easting) <input id="ed-y" inputmode="decimal" placeholder="7504321.00" autocomplete="off"></label>
             </div>
-            <div class="row"><span id="ed-crs" class="muted"></span><button type="submit">Set</button></div>
+            <div class="row"><span id="ed-crs" class="muted"></span><button type="submit" data-i18n="set">Set</button></div>
           </form>
         </div>
 
         <div id="ed-mask-block" hidden>
-          <p class="hint">Click around the part of the drawing to keep. Click the first vertex or press <kbd>Enter</kbd> to close, <kbd>Esc</kbd> cancels.</p>
+          <p class="hint" data-i18n-html="maskHelp">Click around the part of the drawing to keep. Click the first vertex or press <kbd>Enter</kbd> to close, <kbd>Esc</kbd> cancels.</p>
           <div class="toolbar">
-            <button id="ed-mask-finish" type="button">Finish mask</button>
-            <button id="ed-mask-clear" type="button">Remove mask</button>
+            <button id="ed-mask-finish" type="button" data-i18n="maskFinish">Finish mask</button>
+            <button id="ed-mask-clear" type="button" data-i18n="maskClear">Remove mask</button>
           </div>
         </div>
 
-        <label class="field">Overlay opacity <input id="ed-opacity" type="range" min="0" max="1" step="0.05"></label>
+        <label class="field" data-i18n="overlayOpacity">Overlay opacity <input id="ed-opacity" type="range" min="0" max="1" step="0.05"></label>
       </div>
     </aside>
   </div>
 
   <dialog id="add-dialog">
     <form method="dialog" id="add-form">
-      <h2>Add a plan</h2>
-      <label class="field">File <input id="add-file" type="file" accept=".pdf,application/pdf,image/*,.tif,.tiff" required></label>
+      <h2 data-i18n="addTitle">Add a plan</h2>
+      <label class="field" data-i18n="file">File <input id="add-file" type="file" accept=".pdf,application/pdf,image/*,.tif,.tiff" required></label>
       <div id="add-pdf-opts" hidden>
         <div class="row">
-          <label class="field inline">Page <select id="add-page"></select></label>
-          <label class="field inline">Resolution
+          <label class="field inline" data-i18n="page">Page <select id="add-page"></select></label>
+          <label class="field inline" data-i18n="resolution">Resolution
             <select id="add-dpi">
               <option value="100">100 dpi</option>
               <option value="150">150 dpi</option>
@@ -136,26 +137,26 @@
         </div>
       </div>
       <div class="row">
-        <label class="field inline">Max size
+        <label class="field inline" data-i18n="maxSize">Max size
           <select id="add-max">
             <option value="4096">4096 px</option>
             <option value="8192" selected>8192 px</option>
             <option value="12000">12000 px</option>
           </select>
         </label>
-        <label class="field inline">Store as
+        <label class="field inline" data-i18n="storeAs">Store as
           <select id="add-format">
-            <option value="image/jpeg">JPEG (scans)</option>
-            <option value="image/png">PNG (crisp lines)</option>
+            <option value="image/jpeg" data-i18n="jpeg">JPEG (scans)</option>
+            <option value="image/png" data-i18n="png">PNG (crisp lines)</option>
           </select>
         </label>
       </div>
-      <label class="field">Name <input id="add-name" type="text" autocomplete="off"></label>
+      <label class="field" data-i18n="name">Name <input id="add-name" type="text" autocomplete="off"></label>
       <div class="add-preview"><canvas id="add-thumb" width="0" height="0"></canvas><p id="add-info" class="muted"></p></div>
       <p id="add-progress" class="hint"></p>
       <div class="toolbar end">
-        <button value="cancel" formnovalidate type="submit">Cancel</button>
-        <button id="add-go" class="primary" value="ok" type="submit">Add &amp; georeference</button>
+        <button value="cancel" formnovalidate type="submit" data-i18n="cancel">Cancel</button>
+        <button id="add-go" class="primary" value="ok" type="submit" data-i18n="addGo">Add &amp; georeference</button>
       </div>
     </form>
   </dialog>

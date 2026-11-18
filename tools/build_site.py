@@ -28,10 +28,18 @@ def esc(s):
     return html.escape(str(s or ""), quote=True)
 
 
+def plans_pl(n):
+    """1 plan, 2–4 plany, 5+ planów (12–14 planów)."""
+    if n == 1:
+        return "1 plan"
+    few = 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
+    return f"{n} {'plany' if few else 'planów'}"
+
+
 def set_page(app_html, m, base_url):
     slug = m["slug"]
     title = m.get("title") or slug
-    desc = m.get("description") or f"{len(m['layers'])} plan(s) overlaid on aerial photos"
+    desc = m.get("description") or f"{plans_pl(len(m['layers']))} na tle zdjęć lotniczych"
     page_url = f"{base_url}{slug}/" if base_url else ""
     og_image = f"{base_url}data/{slug}/{m['og']}" if base_url and m.get("og") else ""
     meta = [
@@ -56,7 +64,7 @@ def index_page(sets):
     cards = "\n".join(
         f'''<li><a href="{esc(m['slug'])}/"><b>{esc(m.get('title') or m['slug'])}</b>
       <span>{esc(m.get('description'))}</span>
-      <small>{len(m['layers'])} plan{'s' if len(m['layers']) != 1 else ''} · updated {esc(m.get('updated'))}</small></a></li>'''
+      <small>{plans_pl(len(m['layers']))} · aktualizacja {esc(m.get('updated'))}</small></a></li>'''
         for m in sets)
     return f'''<!doctype html>
 <html lang="pl">
@@ -83,7 +91,7 @@ def index_page(sets):
 <body>
 <main>
   <h1>Plany</h1>
-  <p>Plans and designs overlaid on current aerial photos.</p>
+  <p>Plany i projekty nałożone na aktualne zdjęcia lotnicze.</p>
   <ul>
 {cards}
   </ul>
