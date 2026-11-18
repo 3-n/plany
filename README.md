@@ -48,25 +48,54 @@ Basemaps (top-left): Geoportal ortofotomapa (newest, all of Poland), Warsaw foto
 2021 at 5 cm, Esri World Imagery and OSM. You can add cadastral parcels and buildings
 (KIEG) as overlays, which are good for checking alignment.
 
-## Data
+## Plan sets
+
+Plans are grouped in sets, one per project, each published under its own link. Pick or
+create a set at the top of the panel; the URL is `?set=<slug>`.
 
 ```
-data/layers.json        plans: control points, transform, mask, display settings,
-                        plus computed WGS84 corners for other tools
-data/layers/<id>.jpg    rendered raster shown on the map
-data/sources/<id>.pdf   original upload, kept for re-rendering
+data/<slug>/layers.json     plans: control points, transform, mask, display settings
+data/<slug>/layers/<id>.jpg working raster used for georeferencing
+data/<slug>/sources/<id>.*  original upload (PDF, scan, PNG…)
 ```
 
-`layers.json` is plain JSON. Control points are stored as image pixels ↔ WGS84
-lng/lat, so the transform is always recomputed from them.
+`data/` is local and not in git. Several images at once (e.g. a folder of sheets):
 
-## Publishing later
+```sh
+python3 tools/import_images.py metro-minska "E02 Mińska"/*.png --title "Metro M3 – Mińska"
+```
 
-The folder is a static site. Upload it as-is to GitHub Pages, Netlify or any web
-server. With no `server.py` behind it, the app detects that it can't write and turns
-into a read-only viewer, with editing buttons hidden. The URL hash (`#zoom/lat/lng`)
-makes views shareable. If the original PDFs shouldn't be public, leave out
-`data/sources/`.
+## Publishing (GitHub Pages)
+
+```sh
+python3 tools/publish.py metro-minska
+```
+
+→ `https://<user>.github.io/plany/metro-minska/`, and an index of all sets at
+`https://<user>.github.io/plany/`.
+
+- Only georeferenced plans are published. What is visible, the opacity and the display
+  mode at publish time are what viewers see first.
+- Each plan gets two WebP renditions (q75): ≤ 8192 px for desktops, ≤ 4096 px for phones
+  (memory and canvas limits). With a crop mask, only the masked area is published.
+- Images and original files go to the GitHub Release `set-<slug>`, not into git; the repo
+  only gets `site/sets/<slug>.json` (a few kB). The Pages workflow
+  (`.github/workflows/pages.yml`) downloads the images when it builds the site.
+- Viewers can download each original. The address bar always holds the current view and
+  plan settings (`#zoom/lat/lng&on=…&o=…&d=…`), so any link they copy opens exactly that.
+- Needs `brew install webp` (for `cwebp`) and `gh auth login`.
+
+Preview without uploading:
+
+```sh
+python3 tools/publish.py metro-minska --local
+python3 tools/build_site.py --assets local && python3 -m http.server -d _site
+```
+
+Limits: a Pages site may be up to 1 GB and has a soft limit of 100 GB of traffic a
+month. Release files have no total size or traffic limit. If the site gets full, a set's
+manifest can point its images at another Pages repo of the same account with
+`"files": "https://<user>.github.io/plany-2/data/<slug>/"`; links stay the same.
 
 ## When to reach for QGIS instead
 

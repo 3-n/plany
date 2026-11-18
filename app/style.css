@@ -57,8 +57,18 @@ body.editing .map-tag { display: block; }
   grid-area: panel; background: var(--panel); border-left: 1px solid var(--line);
   overflow-y: auto; padding: 12px 14px 24px; min-width: 0;
 }
-.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.panel-head h1 { font-size: 16px; margin: 0; }
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.panel-head h1 { font-size: 16px; margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.panel-head button { font-size: 12px; padding: 4px 9px; white-space: nowrap; }
+#panel-toggle { display: none; }
+.set-desc { margin: -4px 0 10px; color: var(--muted); font-size: 13px; }
+.set-meta { border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 8px; }
+.quick { margin: 0 0 10px; }
+.quick .field { margin: 0; }
+body.editing .quick, body.editing #share-btn { display: none; }
+body.can-edit #share-btn { display: none; }
+a.download { font-size: 12px; align-self: center; color: var(--accent); text-decoration: none; margin-left: auto; }
+a.download:hover { text-decoration: underline; }
 .status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .status.error { color: var(--bad); }
 
@@ -169,5 +179,11 @@ dialog h2 { margin: 0 0 6px; font-size: 17px; }
   #app { grid-template-columns: 1fr; grid-template-rows: 1fr auto; grid-template-areas: "map" "panel"; }
   body.editing #app { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr auto; grid-template-areas: "img" "map" "panel"; }
   body.editing #imgpane { border-right: 0; border-bottom: 2px solid var(--line); }
-  #panel { border-left: 0; border-top: 1px solid var(--line); max-height: 42vh; padding: 10px 16px 16px; }
+  #panel { border-left: 0; border-top: 1px solid var(--line); max-height: 45vh; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+  #panel-toggle { display: inline-block; }
+  .panel-head { margin-bottom: 6px; }
+  .panel-head h1 { font-size: 15px; }
+  body.panel-collapsed #panel > :not(.panel-head):not(.quick) { display: none !important; }
+  body.panel-collapsed .quick { margin-bottom: 0; }
+  input[type="range"] { height: 28px; }
 }

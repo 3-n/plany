@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
-# user-uploaded map layers and source files (large binaries)
-data/layers/
-data/sources/
+# Workshop data: plans, originals and work-in-progress georeferencing stay local.
+# Published sets live in site/sets/ (small JSON); their images go to GitHub Releases.
+data/
+build/
+_site/
+/E02 Mińska/

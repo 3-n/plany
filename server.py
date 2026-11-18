@@ -2,8 +2,9 @@
 """Local server for the plan overlay app.
 
 Serves the folder as a static site and adds a tiny write API so the app can
-save plans into ./data. Without this server (e.g. on GitHub Pages) the same
-files work as a read-only viewer.
+save plans into ./data/<set>/. Each set is one folder with its own layers.json.
+Without this server (e.g. on GitHub Pages) the same files work as a read-only
+viewer.
 
     python3 server.py            # http://localhost:8765
     python3 server.py --port 9000 --no-open
@@ -23,9 +24,27 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, "data")
-MANIFEST = os.path.join(DATA, "layers.json")
-# Only files directly inside these data subfolders may be written or deleted.
+SET_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,47}$")
+# Only files directly inside these subfolders of a set may be written or deleted.
 WRITABLE = re.compile(r"^(layers|sources)/[A-Za-z0-9_.-]{1,120}$")
+
+
+def manifest_path(slug):
+    return os.path.join(DATA, slug, "layers.json")
+
+
+def list_sets():
+    sets = []
+    for slug in sorted(os.listdir(DATA)) if os.path.isdir(DATA) else []:
+        if not SET_SLUG.match(slug) or not os.path.isfile(manifest_path(slug)):
+            continue
+        try:
+            with open(manifest_path(slug), encoding="utf-8") as f:
+                doc = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            doc = {}
+        sets.append({"slug": slug, "title": doc.get("title") or slug, "count": len(doc.get("layers") or [])})
+    return sets
 MAX_UPLOAD = 1024 * 1024 * 1024
 
 
@@ -58,11 +77,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _param(self, name):
+        return parse_qs(urlparse(self.path).query).get(name, [""])[0]
+
+    def _set(self):
+        slug = self._param("set")
+        return slug if SET_SLUG.match(slug) and os.path.isfile(manifest_path(slug)) else None
+
     def _target(self):
-        rel = parse_qs(urlparse(self.path).query).get("path", [""])[0]
-        if not WRITABLE.match(rel) or ".." in rel:
+        slug, rel = self._set(), self._param("path")
+        if not slug or not WRITABLE.match(rel) or ".." in rel:
             return None
-        return os.path.join(DATA, rel)
+        return os.path.join(DATA, slug, rel)
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -75,7 +101,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self._route() == "status":
-            return self._json(200, {"editable": True})
+            return self._json(200, {"editable": True, "sets": list_sets()})
         if self._route() is not None:
             return self._json(404, {"error": "not found"})
         super().do_GET()
@@ -84,10 +110,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         route = self._route()
         try:
             if route == "manifest":
+                slug = self._set()
+                if not slug:
+                    return self._json(400, {"error": "unknown set"})
                 doc = json.loads(self._read_body())
                 if not isinstance(doc, dict) or not isinstance(doc.get("layers"), list):
                     return self._json(400, {"error": "manifest must be {layers: [...]}"})
-                write_atomic(MANIFEST, json.dumps(doc, ensure_ascii=False, indent=1).encode())
+                write_atomic(manifest_path(slug), json.dumps(doc, ensure_ascii=False, indent=1).encode())
                 return self._json(200, {"ok": True})
             if route == "file":
                 target = self._target()
@@ -99,6 +128,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json(400, {"error": str(e)})
         self._json(404, {"error": "not found"})
 
+    def do_POST(self):
+        if self._route() != "sets":
+            return self._json(404, {"error": "not found"})
+        try:
+            doc = json.loads(self._read_body())
+        except (ValueError, json.JSONDecodeError) as e:
+            return self._json(400, {"error": str(e)})
+        slug = str(doc.get("slug", "")).strip()
+        if not SET_SLUG.match(slug):
+            return self._json(400, {"error": "use lowercase letters, digits and dashes, e.g. metro-minska"})
+        if os.path.exists(manifest_path(slug)):
+            return self._json(409, {"error": f"set {slug} already exists"})
+        create_set(slug, str(doc.get("title") or slug))
+        self._json(200, {"ok": True, "slug": slug})
+
     def do_DELETE(self):
         if self._route() == "file":
             target = self._target()
@@ -108,6 +152,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 os.remove(target)
             return self._json(200, {"ok": True})
         self._json(404, {"error": "not found"})
+
+
+def create_set(slug, title):
+    for sub in ("layers", "sources"):
+        os.makedirs(os.path.join(DATA, slug, sub), exist_ok=True)
+    doc = {"version": 1, "title": title, "description": "", "layers": []}
+    write_atomic(manifest_path(slug), json.dumps(doc, ensure_ascii=False, indent=1).encode())
 
 
 def write_atomic(path, data):
@@ -129,10 +180,9 @@ def main():
     ap.add_argument("--no-open", action="store_true", help="don't open Safari")
     args = ap.parse_args()
 
-    os.makedirs(os.path.join(DATA, "layers"), exist_ok=True)
-    os.makedirs(os.path.join(DATA, "sources"), exist_ok=True)
-    if not os.path.exists(MANIFEST):
-        write_atomic(MANIFEST, b'{"version": 1, "layers": []}\n')
+    os.makedirs(DATA, exist_ok=True)
+    if not list_sets():
+        create_set("plany", "Plany")
 
     try:
         httpd = Server(("127.0.0.1", args.port), Handler)

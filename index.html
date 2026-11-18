@@ -24,12 +24,27 @@
 
     <aside id="panel">
       <header class="panel-head">
-        <h1>Plan Overlay</h1>
-        <span id="status" class="status"></span>
+        <h1 id="set-title-view">Plan Overlay</h1>
+        <span id="status" class="status" role="status"></span>
+        <button id="share-btn" type="button" title="Copy a link to exactly this view">Copy link</button>
+        <button id="panel-toggle" type="button" aria-expanded="true">Hide plans ▾</button>
       </header>
+      <p id="set-desc-view" class="set-desc" hidden></p>
+
+      <div id="quick" class="quick" hidden>
+        <label class="field">Plan opacity <input id="quick-opacity" type="range" min="0" max="1" step="0.05"></label>
+      </div>
 
       <!-- Plan list -->
       <div id="list-view" class="view">
+        <div class="set-meta edit-only">
+          <div class="row">
+            <label class="field inline">Plan set <select id="set-select"></select></label>
+            <button id="set-new" type="button">New set</button>
+          </div>
+          <label class="field">Title (shown on the published page) <input id="set-title" type="text" autocomplete="off"></label>
+          <label class="field">Description (for link previews) <input id="set-desc" type="text" autocomplete="off"></label>
+        </div>
         <div class="toolbar">
           <button id="add-btn" class="primary edit-only" type="button">+ Add plan (PDF / image)</button>
         </div>

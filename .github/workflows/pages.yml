@@ -1,0 +1,43 @@
+# Builds the public site: the app + every set in site/sets/, with each set's map
+# images downloaded from its "set-<slug>" release (they are never committed).
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths: [index.html, "app/**", "vendor/**", "site/**", tools/build_site.py, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Build site
+        run: python3 tools/build_site.py --assets release --base-url "${{ steps.pages.outputs.base_url }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

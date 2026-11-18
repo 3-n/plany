@@ -5,8 +5,16 @@ const L = window.L;
 const proj4 = window.proj4;
 const $ = (sel) => document.querySelector(sel);
 
+// Published set pages define window.PLANY = { set, base } before loading the app.
+const PUB = window.PLANY || null;
+const SMALL_SCREEN = matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+
 const state = {
   editable: false,
+  set: null, // slug of the plan set being shown
+  sets: [], // all local sets (workshop only)
+  meta: { title: '', description: '' },
+  files: '', // base URL of the set's files
   layers: [],
   selectedId: null,
 };
@@ -45,7 +53,7 @@ function manifest() {
         .map((c) => fit.imageToLngLat(c).map((x) => +x.toFixed(8)))
       : null;
   }
-  return { version: 1, layers: state.layers };
+  return { version: 1, title: state.meta.title, description: state.meta.description, layers: state.layers };
 }
 
 function scheduleSave() {
@@ -61,7 +69,7 @@ async function flushSave(keepalive = false) {
   if (!dirty) return;
   dirty = false;
   try {
-    const r = await fetch('api/manifest', {
+    const r = await fetch(`api/manifest?set=${state.set}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(manifest()), keepalive,
     });
     if (!r.ok) throw new Error((await r.json()).error || r.statusText);
@@ -73,24 +81,43 @@ async function flushSave(keepalive = false) {
 }
 
 async function putFile(path, blob) {
-  const r = await fetch(`api/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: blob });
+  const r = await fetch(`api/file?set=${state.set}&path=${encodeURIComponent(path)}`, { method: 'PUT', body: blob });
   if (!r.ok) throw new Error(`Upload failed: ${(await r.json()).error || r.statusText}`);
 }
 
 async function deleteFile(path) {
-  if (path) await fetch(`api/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+  if (path) await fetch(`api/file?set=${state.set}&path=${encodeURIComponent(path)}`, { method: 'DELETE' });
 }
 
 async function loadState() {
-  try {
-    const r = await fetch('api/status', { cache: 'no-store' });
-    state.editable = r.ok && (await r.json()).editable === true;
-  } catch { state.editable = false; }
+  let status = null;
+  if (!PUB) {
+    try {
+      const r = await fetch('api/status', { cache: 'no-store' });
+      if (r.ok) status = await r.json();
+    } catch { /* static hosting: read-only */ }
+  }
+  state.editable = status?.editable === true;
+  state.sets = status?.sets || [];
+  const asked = new URLSearchParams(location.search).get('set');
+  state.set = PUB?.set || (state.sets.some((s) => s.slug === asked) ? asked : state.sets[0]?.slug) || asked;
+  if (state.editable && state.set !== asked) {
+    history.replaceState(null, '', `?set=${state.set}${location.hash}`);
+  }
   document.body.classList.toggle('can-edit', state.editable);
-  setStatus(state.editable ? 'Saved' : 'Read-only');
+  document.body.classList.toggle('published', !state.editable);
+  setStatus(state.editable ? 'Saved' : '');
+  if (!state.set) return;
+  const base = PUB?.base || `data/${state.set}/`;
   try {
-    const r = await fetch('data/layers.json', { cache: 'no-store' });
-    if (r.ok) state.layers = (await r.json()).layers || [];
+    const r = await fetch(`${base}layers.json`, { cache: 'no-cache' });
+    if (r.ok) {
+      const doc = await r.json();
+      state.layers = doc.layers || [];
+      state.meta = { title: doc.title || '', description: doc.description || '' };
+      // A set's images may live on another site (e.g. an overflow Pages repo).
+      state.files = doc.files ? new URL(doc.files, new URL(base, document.baseURI)).href : base;
+    }
   } catch { /* no data yet */ }
 }
 
@@ -155,15 +182,60 @@ L.control.layers(basemaps, overlays, { position: 'topleft' }).addTo(map);
 map.on('baselayerchange', (e) => store.set('basemap', e.name));
 map.on('overlayadd overlayremove', () => store.set('overlays', Object.keys(overlays).filter((n) => map.hasLayer(overlays[n]))));
 
-// URL hash keeps the view: #zoom/lat/lng
-function viewFromHash() {
-  const m = location.hash.match(/^#(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/);
-  return m ? { zoom: +m[1], center: [+m[2], +m[3]] } : null;
+// The URL hash holds the view and, on published pages, any plan settings that differ
+// from the set's defaults, so the address bar is always a shareable link:
+//   #zoom/lat/lng&on=id,id&o=id:60&d=id:k
+const MODE_CODES = { multiply: 'm', normal: 'n', knockout: 'k', 'knockout-invert': 'i' };
+const CODE_MODES = Object.fromEntries(Object.entries(MODE_CODES).map(([k, v]) => [v, k]));
+const layerDefaults = new Map(); // id -> { visible, opacity, display } as published
+
+function readHash() {
+  const [view = '', ...rest] = location.hash.slice(1).split('&');
+  const m = view.match(/^(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/);
+  const p = new URLSearchParams(rest.join('&'));
+  const pairs = (k) => (p.get(k) || '').split(',').filter(Boolean).map((x) => x.split(':'));
+  return {
+    view: m ? { zoom: +m[1], center: [+m[2], +m[3]] } : null,
+    on: p.has('on') ? p.get('on').split(',').filter(Boolean) : null,
+    opacity: pairs('o'),
+    display: pairs('d'),
+  };
 }
-map.on('moveend', () => {
+
+function applyHashLayers(h) {
+  if (h.on) for (const l of state.layers) l.visible = h.on.includes(l.id);
+  for (const [id, pct] of h.opacity) {
+    const l = byId(id);
+    if (l && Number.isFinite(+pct)) l.opacity = Math.min(1, Math.max(0, +pct / 100));
+  }
+  for (const [id, code] of h.display) {
+    const l = byId(id);
+    if (l && CODE_MODES[code]) l.display = CODE_MODES[code];
+  }
+}
+
+function hashString() {
   const c = map.getCenter();
-  history.replaceState(null, '', `#${map.getZoom()}/${c.lat.toFixed(6)}/${c.lng.toFixed(6)}`);
-});
+  let h = `#${+map.getZoom().toFixed(1)}/${c.lat.toFixed(6)}/${c.lng.toFixed(6)}`;
+  if (state.editable) return h; // in the workshop the saved set is the state
+  const def = (l) => layerDefaults.get(l.id) || {};
+  const on = state.layers.filter((l) => l.visible !== false).map((l) => l.id);
+  const defOn = state.layers.filter((l) => def(l).visible !== false).map((l) => l.id);
+  if (on.join() !== defOn.join()) h += `&on=${on.join(',')}`;
+  const o = state.layers.filter((l) => (l.opacity ?? 0.7) !== (def(l).opacity ?? 0.7)).map((l) => `${l.id}:${Math.round((l.opacity ?? 0.7) * 100)}`);
+  if (o.length) h += `&o=${o.join(',')}`;
+  const d = state.layers.filter((l) => (l.display || 'multiply') !== (def(l).display || 'multiply')).map((l) => `${l.id}:${MODE_CODES[l.display]}`);
+  if (d.length) h += `&d=${d.join(',')}`;
+  return h;
+}
+
+let hashTimer = null;
+function writeHash() {
+  // Debounced: Safari throws after 100 history updates in 30 s (slider drags add up).
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => history.replaceState(null, '', location.pathname + location.search + hashString()), 250);
+}
+map.on('moveend', writeHash);
 
 // ---------------------------------------------------------------- measuring
 
@@ -221,7 +293,23 @@ const measure = new Measure().addTo(map);
 
 // ---------------------------------------------------------------- plan overlays
 
-const imageUrl = (layer) => `data/${layer.image}?v=${layer.rev || 0}`;
+// Published layers carry two renditions; phones get the smaller one (memory, canvas limits).
+function imageUrl(layer) {
+  const file = layer.images ? (SMALL_SCREEN && layer.images.mobile) || layer.images.web : layer.image;
+  return `${state.files}${file}?v=${layer.rev || 0}`;
+}
+
+// Published images may be cropped to the mask; map image pixels back to layer pixels.
+function geometry(layer, fit) {
+  const [x0, y0, x1, y1] = layer.crop || [0, 0, layer.width, layer.height];
+  if (!x0 && !y0) return { w: x1, h: y1, toLngLat: fit.imageToLngLat, mask: layer.mask };
+  return {
+    w: x1 - x0,
+    h: y1 - y0,
+    toLngLat: ([u, v]) => fit.imageToLngLat([u + x0, v + y0]),
+    mask: layer.mask && layer.mask.map(([u, v]) => [u - x0, v - y0]),
+  };
+}
 
 // "Colour to alpha" against white: paper becomes transparent, colours stay as drawn.
 // Near-white scan noise above `paper` is treated as white.
@@ -289,13 +377,14 @@ async function syncOverlay(layer) {
     return;
   }
   if (token !== r.token || !byId(layer.id)) return; // superseded by a newer call, or deleted
+  const g = geometry(layer, r.fit);
   if (!r.overlay) {
-    r.overlay = new WarpedImage(source, layer.width, layer.height, r.fit.imageToLngLat);
+    r.overlay = new WarpedImage(source, g.w, g.h, g.toLngLat);
   } else {
-    r.overlay.setSource(source).setTransform(r.fit.imageToLngLat);
+    r.overlay.setSource(source).setTransform(g.toLngLat);
   }
   r.overlay.setOpacity(layer.opacity ?? 0.7).setBlend(disp.blend).setFilter(disp.filter || '')
-    .setMask(layer.mask).setZIndex(layerZ(layer));
+    .setMask(g.mask).setZIndex(layerZ(layer));
   if (!map.hasLayer(r.overlay)) r.overlay.addTo(map);
 }
 
@@ -342,15 +431,15 @@ function renderList() {
     const vis = el('input', {
       type: 'checkbox', checked: layer.visible !== false, title: 'Show/hide (T)',
       onclick: (e) => e.stopPropagation(),
-      onchange: (e) => { layer.visible = e.target.checked; syncOverlay(layer); scheduleSave(); },
+      onchange: (e) => { layer.visible = e.target.checked; syncOverlay(layer); layerChanged(); renderQuick(); },
     });
     const opacity = el('input', {
       type: 'range', min: 0, max: 1, step: 0.05, value: layer.opacity ?? 0.7, title: 'Opacity',
-      oninput: (e) => { layer.opacity = +e.target.value; r.overlay?.setOpacity(layer.opacity); scheduleSave(); },
+      oninput: (e) => { layer.opacity = +e.target.value; r.overlay?.setOpacity(layer.opacity); layerChanged(); renderQuick(); },
     });
     const display = el('select', {
       title: 'How the plan is drawn over the photo',
-      onchange: (e) => { layer.display = e.target.value; syncOverlay(layer); scheduleSave(); },
+      onchange: (e) => { layer.display = e.target.value; syncOverlay(layer); layerChanged(); },
     }, ...Object.entries(DISPLAY).map(([v, d]) => el('option', { value: v, selected: (layer.display || 'multiply') === v }, d.label)));
     const actions = el('div', { class: 'layer-actions' },
       el('button', { type: 'button', disabled: !r.fit, onclick: () => { const b = planBounds(layer); if (b) map.fitBounds(b); } }, 'Zoom to'),
@@ -358,6 +447,7 @@ function renderList() {
       state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, -1), title: 'Draw above the plan before it' }, '↑') : null,
       state.editable ? el('button', { type: 'button', onclick: () => moveLayer(layer, 1), title: 'Draw below the plan after it' }, '↓') : null,
       state.editable ? el('button', { type: 'button', class: 'danger', onclick: () => removeLayer(layer) }, 'Delete') : null,
+      downloadLink(layer),
     );
     const li = el('li', {
       class: `layer${state.selectedId === layer.id ? ' selected' : ''}`,
@@ -374,7 +464,40 @@ function renderList() {
   hint.textContent = state.editable
     ? 'No plans yet. Add a PDF or a scan, then match a few points between the plan and the aerial photo.'
     : 'No plans published here yet.';
+  renderQuick();
 }
+
+function layerChanged() {
+  scheduleSave();
+  writeHash();
+}
+
+function downloadLink(layer) {
+  const d = layer.download || (layer.source && { url: `${state.files}${layer.source}`, name: layer.sourceName });
+  if (!d) return null;
+  const ext = (d.name || d.url).split('.').pop().toUpperCase().slice(0, 4);
+  const size = d.size ? `, ${(d.size / 1e6).toFixed(d.size < 1e7 ? 1 : 0)} MB` : '';
+  return el('a', { class: 'download', href: d.url, download: d.name || '', title: d.name || '' }, `Original (${ext}${size}) ↓`);
+}
+
+// One slider for every visible plan: the quickest "before / after" on a phone.
+function renderQuick() {
+  const shown = state.layers.filter((l) => l.visible !== false && rt(l.id).fit);
+  $('#quick').hidden = !state.layers.some((l) => rt(l.id).fit);
+  const slider = $('#quick-opacity');
+  slider.disabled = !shown.length;
+  slider.value = shown.length ? Math.max(...shown.map((l) => l.opacity ?? 0.7)) : 0;
+}
+
+$('#quick-opacity').addEventListener('input', (e) => {
+  for (const l of state.layers) {
+    if (l.visible === false) continue;
+    l.opacity = +e.target.value;
+    rt(l.id).overlay?.setOpacity(l.opacity);
+  }
+  layerChanged();
+});
+$('#quick-opacity').addEventListener('change', () => renderList());
 
 function moveLayer(layer, dir) {
   const i = state.layers.indexOf(layer), j = i + dir;
@@ -397,6 +520,64 @@ async function removeLayer(layer) {
   await deleteFile(layer.image);
   await deleteFile(layer.source);
 }
+
+// ---------------------------------------------------------------- set header, sharing, set picker
+
+function renderSetInfo() {
+  const title = state.meta.title || (state.editable ? state.set : '') || 'Plan Overlay';
+  $('#set-title-view').textContent = title;
+  document.title = state.editable ? `${title} · Plan Overlay` : title;
+  const desc = $('#set-desc-view');
+  desc.textContent = state.meta.description;
+  desc.hidden = state.editable || !state.meta.description;
+  if (!state.editable) return;
+  const pick = $('#set-select');
+  pick.replaceChildren(...state.sets.map((s) => el('option', { value: s.slug, selected: s.slug === state.set }, `${s.title} (${s.count})`)));
+  $('#set-title').value = state.meta.title;
+  $('#set-desc').value = state.meta.description;
+}
+
+$('#set-select').addEventListener('change', async (e) => {
+  await flushSave();
+  location.href = `?set=${e.target.value}`;
+});
+$('#set-new').addEventListener('click', async () => {
+  const slug = prompt('Short name for the new set, used in its link (lowercase, digits, dashes):', '');
+  if (!slug) return;
+  const r = await fetch('api/sets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug.trim(), title: slug.trim() }) });
+  const res = await r.json();
+  if (!r.ok) return alert(res.error || r.statusText);
+  await flushSave();
+  location.href = `?set=${res.slug}`;
+});
+for (const [id, key] of [['#set-title', 'title'], ['#set-desc', 'description']]) {
+  $(id).addEventListener('input', (e) => { state.meta[key] = e.target.value; scheduleSave(); });
+}
+
+function setPanelOpen(open) {
+  document.body.classList.toggle('panel-collapsed', !open);
+  $('#panel-toggle').setAttribute('aria-expanded', String(open));
+  $('#panel-toggle').textContent = open ? 'Hide plans ▾' : `Plans (${state.layers.length}) ▴`;
+  setTimeout(() => map.invalidateSize(), 0);
+}
+$('#panel-toggle').addEventListener('click', () => setPanelOpen(document.body.classList.contains('panel-collapsed')));
+
+$('#share-btn').addEventListener('click', async () => {
+  clearTimeout(hashTimer);
+  history.replaceState(null, '', location.pathname + location.search + hashString());
+  const url = location.href;
+  try {
+    if (SMALL_SCREEN && navigator.share) {
+      await navigator.share({ title: document.title, url });
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    setStatus('Link copied');
+  } catch (e) {
+    if (e.name !== 'AbortError') prompt('Copy this link:', url);
+  }
+  setTimeout(() => setStatus(state.editable ? 'Saved' : ''), 2000);
+});
 
 // ---------------------------------------------------------------- adding plans
 
@@ -1017,22 +1198,41 @@ document.addEventListener('keydown', (e) => {
     const targets = ed.layer ? [ed.layer] : state.selectedId ? [byId(state.selectedId)] : state.layers;
     const on = !targets.some((l) => l.visible !== false);
     targets.forEach((l) => { l.visible = on; syncOverlay(l); });
-    if (!ed.layer) renderList();
+    if (!ed.layer) { renderList(); writeHash(); }
   }
 });
 
 // ---------------------------------------------------------------- start
 
 await loadState();
-for (const layer of state.layers) rt(layer.id).fit = fitTransform(layer.points || [], layer.method || 'auto');
-const hashView = viewFromHash();
-const all = state.layers.map(planBounds).filter(Boolean);
-if (hashView) map.setView(hashView.center, hashView.zoom);
+for (const layer of state.layers) {
+  rt(layer.id).fit = fitTransform(layer.points || [], layer.method || 'auto');
+  layerDefaults.set(layer.id, { visible: layer.visible, opacity: layer.opacity, display: layer.display });
+}
+renderSetInfo();
+const initial = readHash();
+if (!state.editable) applyHashLayers(initial);
+const shown = state.layers.filter((l) => l.visible !== false).map(planBounds).filter(Boolean);
+const all = shown.length ? shown : state.layers.map(planBounds).filter(Boolean);
+if (initial.view) map.setView(initial.view.center, initial.view.zoom);
 else if (all.length) map.fitBounds(all.reduce((a, b) => a.extend(b), L.latLngBounds(all[0].getSouthWest(), all[0].getNorthEast())));
 else map.setView([52.2297, 21.0122], 13);
+if (SMALL_SCREEN && !state.editable) setPanelOpen(false);
 renderList();
 await syncAll();
 renderList();
+
+// Pasting a different link into the same tab.
+window.addEventListener('hashchange', () => {
+  const h = readHash();
+  if (h.view) map.setView(h.view.center, h.view.zoom);
+  if (!state.editable) {
+    for (const l of state.layers) Object.assign(l, layerDefaults.get(l.id));
+    applyHashLayers(h);
+    syncAll();
+    renderList();
+  }
+});
 
 // Handy from the browser console.
 window.planOverlay = { state, ed, map, runtime };
